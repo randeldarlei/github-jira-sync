@@ -1,0 +1,135 @@
+name: jira issues Integration
+
+on:
+  issues:
+    types:
+      - opened
+      - closed
+  issue_comment:
+    types:
+      - created
+
+jobs:
+  Jira_Integration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get Issue Details
+        id: issue_details
+        run: |
+          echo "${{ github.event.issue.title }}" >> summary.txt
+          echo "${{ github.event.issue.body }}" >> description.txt
+          echo "${{ github.event.comment.body }}" >> event.txt
+          echo -n "${{ secrets.ATLASSIAN_USER }}:${{ secrets.ATLASSIAN_TOKEN }}" | base64 -w0 | tr -d '\n' >> auth_token.txt
+
+      - name: Create Issue in Jira 
+        if: ${{ github.event_name == 'issues' && github.event.action == 'opened' }}
+        id: create_jira_issue
+        run: |
+          summary=$(cat summary.txt)
+          description=$(cat description.txt)
+          description=$(echo "${description}" | tr -d '\n' | tr -d '\r')
+          token=$(cat auth_token.txt)
+
+          response=$(curl -v --request POST \
+                    --url 'https://my_jira_account.atlassian.net/rest/api/3/issue' \
+                    --header "Authorization: Basic $token" \
+                    --header 'Accept: application/json' \
+                    --header 'Content-Type: application/json' \
+                    --data '{
+                      "fields": {
+                        "project": {
+                          "key": "GIT"
+                        },
+                        "summary": "'"${summary}"'",
+                        "description": {
+                          "content": [
+                            {
+                              "content": [
+                                {
+                                  "text": "'"${description}"'",
+                                  "type": "text"
+                                }
+                              ],
+                              "type": "paragraph"
+                            }
+                          ],
+                          "type": "doc",
+                          "version": 1
+                        },
+                        "issuetype": {
+                          "name": "Task"
+                        }
+                      }
+                    }')
+
+      - name: Get Issue ID
+        if: ${{ (github.event_name == 'issues' || github.event_name == 'issue_comment') && github.event.action != 'opened' }}
+        id: obter_issue_id
+        run: |
+          summary=$(cat summary.txt)
+          description=$(cat description.txt)
+          token=$(cat auth_token.txt)
+
+          encoded_summary=$(echo "$summary" | jq -s -R -r @uri)
+          encoded_description=$(echo "$description" | jq -s -R -r @uri)
+
+          response=$(curl --request GET \
+            --url "https://my_jira_account.atlassian.net/rest/api/3/search?jql=summary~'${encoded_summary}'&description='${encoded_description}'" \
+            --header "Authorization: Basic $token" \
+            --header 'Accept: application/json')
+
+          issue_id=$(echo "$response" | jq -r '.issues[0].id')
+          echo "$issue_id" >> id.txt
+          cat id.txt
+
+
+      - name: Add Comment to Jira Issue
+        if: ${{ github.event_name == 'issue_comment' && github.event.action == 'created' }}
+        id: Add_Comment
+        run: |
+          issue_id=$(cat id.txt)
+          issue_id="${issue_id%$cr}"
+
+          event=$(cat event.txt)
+          event=$(echo "${event}" | tr -d '\n' | tr -d '\r')
+
+          token=$(cat auth_token.txt)
+
+          response=$(curl -v --request POST \
+                    --url "https://my_jira_account.atlassian.net/rest/api/3/issue/${issue_id}/comment" \
+                    --header "Authorization: Basic $token" \
+                    --header 'Accept: application/json' \
+                    --header 'Content-Type: application/json' \
+                    --data '{
+                    "body": {
+                      "content": [
+                        {
+                          "content": [
+                            {
+                              "text": "'"${event}"'",
+                              "type": "text"
+                            }
+                          ],
+                          "type": "paragraph"
+                        }
+                      ],
+                      "type": "doc",
+                      "version": 1
+                    },
+                    "visibility": {
+                      "type": "role",
+                      "value": "Membro do Time"
+                    }
+                  }')
+
+      - name: Close Issue
+        if: ${{ github.event_name == 'issues' && github.event.action == 'closed' }}
+        id: close_issue
+        run: |
+          issue_id=$(cat id.txt)
+          issue_id="${issue_id%$cr}"
+          token=$(cat auth_token.txt)
+
+          response=$(curl -v --request DELETE \
+              --url "https://my_jira_account.atlassian.net/rest/api/3/issue/${issue_id}" \
+              --header "Authorization: Basic $token")
