@@ -14,7 +14,7 @@ When an Issue is opened or updated, the Workflow triggers the creation of a Task
 - Add your Jira project key in the field below:
 
 ´´´
-- name: Create Issue in Jira 
+name: Create Issue in Jira 
         if: ${{ github.event_name == 'issues' && github.event.action == 'opened' }}
         id: create_jira_issue
         run: |
