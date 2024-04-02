@@ -4,7 +4,9 @@ This project performs real-time synchronizations od issues from Github to Jira.
 ### How Workflow Works?
 When an Issue is opened or updated, the Workflow triggers the creation of a Task on your Jira board, adds or updates comments, and also deletes them. The Workflow just needs to be present in the '.github' folder. It's mandatory for the folder to be in the root directory, otherwise the process will fail.
 
-- You can read more about Atlassian API here
+- You Need the ATLASSIAN_USER and ATLASSIAN_TOKEN to generate auth_token.
+
+- You can read more about Atlassian API here:
   https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/#version
 
 ### Sync Issues
