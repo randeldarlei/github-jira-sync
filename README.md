@@ -13,6 +13,7 @@ When an Issue is opened or updated, the Workflow triggers the creation of a Task
 - Add the "your-team-user" account and grant Administrator and Team Member permissions.
 - Add your Jira project key in the field below:
 
+```yml
 name: Create Issue in Jira 
         if: ${{ github.event_name == 'issues' && github.event.action == 'opened' }}
         id: create_jira_issue
@@ -31,3 +32,4 @@ name: Create Issue in Jira
                       "fields": {
                         "project": {
                           "key": "project-key-here"
+```
